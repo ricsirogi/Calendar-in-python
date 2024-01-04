@@ -15,6 +15,7 @@ class Calendar():
         self.year_numbers = list(range(self.MIN_YEAR, self.MAX_YEAR + 1))
         self.month_names = ["January", "February", "March", "April", "May", "June",
                             "July", "August", "September", "October", "November", "December"]
+        self.days_in_a_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
         self.years: list[Year] = []
 
@@ -55,6 +56,12 @@ class Calendar():
         self.change_year_combobox["values"] = [str(year) for year in self.year_numbers]
         self.change_month_combobox["values"] = list(self.month_names)
 
+        self.days_in_a_week_labels = []
+        for count, day_name in enumerate(self.days_in_a_week):
+            day_label = tk.Label(self.month_display_frame, font=self.general_font, text=day_name)
+            self.days_in_a_week_labels.append(day_label)
+            day_label.grid(row=0, column=count)
+
         self.intro_text_label.grid(row=0, column=1)
         self.year_name_label.grid(row=1, column=1)
         self.month_name_label.grid(row=2, column=1)
@@ -91,17 +98,6 @@ class Calendar():
             self.update_label("y")
 
         self.update_label("m")
-
-        # If we got to either edge of the calendar, disable the button in that direction
-        # and enable the button, if we're not at the edge anymore
-        #! still need to account for when I jumpt to the "edge date" with the comboboxes
-        if self.current_month == 0 and self.current_year == 0:
-            self.navigate_left_button["state"] = "disabled"
-        elif self.current_month == 11 and self.current_year == len(self.year_numbers) - 1:
-            self.navigate_right_button["state"] = "disabled"
-        else:
-            self.navigate_left_button["state"] = "normal"
-            self.navigate_right_button["state"] = "normal"
 
         self.display_month()
 
@@ -155,17 +151,28 @@ class Calendar():
         return (-1, -1)
 
     def display_month(self):
-        for child_name, child in self.month_display_frame.children.items():
-            child.grid_forget()
+        for i, (child_name, child) in enumerate(self.month_display_frame.children.items()):
+            if i >= 7 and child_name != "label":
+                child.grid_forget()
         for day in self.years[self.current_year].months[self.current_month].days:
-            row = day.week_index
+            row = day.week_index + 1  # +1 because the first row is for the days of the week
             column = day.day_index
             day_label = tk.Label(self.month_display_frame, font=self.general_font,
-                                 text=str(day.day_num) + "\n" + day.day_name)
+                                 text=day.day_num, border=2, relief="groove", width=12, height=4, anchor="n")
 
             day_label.grid(row=row, column=column)
 
             day_label.bind("<Button-1>", lambda event: day.add_event())
+
+        # If we got to either edge of the calendar, disable the button in that direction
+        # and enable the button, if we're not at the edge anymore
+        if self.current_month == 0 and self.current_year == 0:
+            self.navigate_left_button["state"] = "disabled"
+        elif self.current_month == 11 and self.current_year == len(self.year_numbers) - 1:
+            self.navigate_right_button["state"] = "disabled"
+        else:
+            self.navigate_left_button["state"] = "normal"
+            self.navigate_right_button["state"] = "normal"
 
     def add_event(self):
         """
@@ -287,25 +294,33 @@ class Day():
             self.error_label["text"] = "Please enter an event description!"
             return
         if from_time == "" or not re.match(r"[0-9][0-9]:[0-9][0-9]", from_time):
-            self.error_label["text"] = "Please enter a starting time!"
+            self.error_label["text"] = "Please enter a valid starting time!"
             return
         if to_time == "" or not re.match(r"[0-9][0-9]:[0-9][0-9]", to_time):
-            self.error_label["text"] = "Please enter a ending time!"
+            self.error_label["text"] = "Please enter a valid ending time!"
             return
         if not self.check_time_validity(from_time) or not self.check_time_validity(to_time):
             self.error_label["text"] = "Please enter a valid starting/ending time!"
+            return
+
+        from_time_h, from_time_m = self.check_time_validity(from_time)  # type:ignore
+        to_time_h, to_time_m = self.check_time_validity(to_time)  # type:ignore
+        if to_time_h < from_time_h or (to_time_h == from_time_h and to_time_m < from_time_m):
+            self.error_label["text"] = "The event cannot end before it starts!"
             return
 
         self.events.append(Event(from_time, to_time, event_name, event_description, self.event_id_tracker))
 
         self.event_id_tracker += 1
 
-    def check_time_validity(self, time: str) -> tuple[int, int] | bool:
+    def check_time_validity(self, time: str) -> tuple[int, int] | None:
+        """
+        returns none if the time is invalid, otherwise returns a tuple of the hour and minute
+        """
         hour = int(time[0:2])
         minute = int(time[3:5])
-        if hour > 23 or minute > 59:
-            return False
-        return (hour, minute)
+        if 0 <= hour <= 23 and 0 <= minute <= 59:
+            return (hour, minute)
 
     def delete_event(self, event_id: int):
         for count, event in enumerate(self.events):
@@ -323,6 +338,11 @@ class Event():
         self.event_description = event_description
         self.event_id = event_id
         print("Event created successfully!", from_time, to_time, event_name, event_description, event_id)
+
+    def modify_event(self, event):
+        self.modify_event_window = tk.Tk()
+        self.modify_event_window.title("Modify event")
+        self.modify_event_window.mainloop()
 
 
 if __name__ == "__main__":
