@@ -5,13 +5,14 @@ This program is a calendar.
 from datetime import date
 import tkinter as tk
 from tkinter import ttk
+import re
 
 
 class Calendar():
     def __init__(self) -> None:
         self.MIN_YEAR = 1970
         self.MAX_YEAR = 2050
-        self.year_numbers = [i for i in range(self.MIN_YEAR, self.MAX_YEAR + 1)]
+        self.year_numbers = list(range(self.MIN_YEAR, self.MAX_YEAR + 1))
         self.month_names = ["January", "February", "March", "April", "May", "June",
                             "July", "August", "September", "October", "November", "December"]
 
@@ -52,7 +53,7 @@ class Calendar():
         self.change_year_combobox = ttk.Combobox(self.navigation_frame, textvariable=self.year_stringvar)
         self.change_month_combobox = ttk.Combobox(self.navigation_frame, textvariable=self.month_stringvar)
         self.change_year_combobox["values"] = [str(year) for year in self.year_numbers]
-        self.change_month_combobox["values"] = [month for month in self.month_names]
+        self.change_month_combobox["values"] = list(self.month_names)
 
         self.intro_text_label.grid(row=0, column=1)
         self.year_name_label.grid(row=1, column=1)
@@ -90,9 +91,17 @@ class Calendar():
             self.update_label("y")
 
         self.update_label("m")
+
         # If we got to either edge of the calendar, disable the button in that direction
         # and enable the button, if we're not at the edge anymore
-        pass
+        #! still need to account for when I jumpt to the "edge date" with the comboboxes
+        if self.current_month == 0 and self.current_year == 0:
+            self.navigate_left_button["state"] = "disabled"
+        elif self.current_month == 11 and self.current_year == len(self.year_numbers) - 1:
+            self.navigate_right_button["state"] = "disabled"
+        else:
+            self.navigate_left_button["state"] = "normal"
+            self.navigate_right_button["state"] = "normal"
 
         self.display_month()
 
@@ -138,13 +147,12 @@ class Calendar():
         """
         if not widget_to_grid:
             return (widget_to_forget.grid_info()["row"], widget_to_forget.grid_info()["column"])
-        else:
-            row, column = self.get_row_column_of_widget(widget_to_forget)
+        row, column = self.get_row_column_of_widget(widget_to_forget)
 
-            widget_to_forget.grid_forget()
+        widget_to_forget.grid_forget()
 
-            widget_to_grid.grid(row=row, column=column)
-            return (-1, -1)
+        widget_to_grid.grid(row=row, column=column)
+        return (-1, -1)
 
     def display_month(self):
         for child_name, child in self.month_display_frame.children.items():
@@ -157,19 +165,25 @@ class Calendar():
 
             day_label.grid(row=row, column=column)
 
+            day_label.bind("<Button-1>", lambda event: day.add_event())
+
     def add_event(self):
+        """
+        Obsolete, since the calendar is not in the console anymore,
+        but could still use this during testing
+        """
         from_time = input("From what time will the event take place?\nFormat: HHMM\n")
         to_time = input("Until what time will the event take place?\nFormat: HHMM\n")
         event_name = input("What will be the name of the event?\n")
         event_description = input("Description\n")
 
-        date = input("When does the event take place?\nFormat: YYYYMMDD\n")
-        year = int(date[0:4])
+        event_date = input("When does the event take place?\nFormat: YYYYMMDD\n")
+        year = int(event_date[0:4])
         year = self.year_numbers.index(year)
-        month = int(date[4:6]) - 1
-        day = int(date[6:8]) - 1
+        month = int(event_date[4:6]) - 1
+        day = int(event_date[6:8]) - 1
 
-        self.years[year].months[month].days[day].add_event(from_time, to_time, event_name, event_description)
+        self.years[year].months[month].days[day].add_event()
 
 
 class Year():
@@ -189,10 +203,7 @@ class Year():
                 self.months.append(Month(name, length, self.starting_day))
 
     def is_leap_year(self, year_num: int) -> bool:
-        if (year_num % 100 != 0 and year_num % 4 == 0) or (year_num % 100 == 0 and year_num % 400 == 0):
-            return True
-        else:
-            return False
+        return (year_num % 100 != 0 and year_num % 4 == 0) or (year_num % 100 == 0 and year_num % 400 == 0)
 
 
 class Month():
@@ -227,17 +238,80 @@ class Day():
         self.event_id_tracker = 0
         self.events: list[Event] = []
 
-    def add_event(self, from_time: str, to_time: str, event_name: str, event_description: str):
+    def add_event(self):
+        self.event_window = tk.Tk()
+        self.event_window.title("Add event")
+
+        self.event_name_label = tk.Label(self.event_window, text="Event name:")
+        self.event_name_entry = tk.Entry(self.event_window)
+        self.from_time_label = tk.Label(self.event_window, text="Event starts at:")
+        self.from_time_entry = tk.Entry(self.event_window)
+        self.to_time_label = tk.Label(self.event_window, text="Event ends at:")
+        self.to_time_entry = tk.Entry(self.event_window)
+        self.event_description_label = tk.Label(self.event_window, text="Event description:")
+        self.event_description_entry = tk.Entry(self.event_window)
+        self.error_label = tk.Label(self.event_window, text="")
+
+        self.event_create_button = tk.Button(self.event_window, text="Create event",
+                                             command=lambda: self.create_event())
+        self.event_cancel_button = tk.Button(self.event_window, text="Cancel",
+                                             command=lambda: self.event_window.destroy())
+
+        self.event_name_label.grid(row=0, column=0)
+        self.event_name_entry.grid(row=0, column=1)
+        self.from_time_label.grid(row=1, column=0)
+        self.from_time_entry.grid(row=1, column=1)
+        self.to_time_label.grid(row=2, column=0)
+        self.to_time_entry.grid(row=2, column=1)
+        self.event_description_label.grid(row=3, column=0)
+        self.event_description_entry.grid(row=3, column=1)
+        self.event_create_button.grid(row=0, column=2, rowspan=4)
+        self.event_cancel_button.grid(row=4, column=2)
+        self.error_label.grid(row=5, column=0, columnspan=3)
+
+        self.event_window.mainloop()
+
+    def create_event(self):
+        """
+        This function mainly checks if the user inputted correct data.
+        """
+        event_name = self.event_name_entry.get()
+        from_time = self.from_time_entry.get()
+        to_time = self.to_time_entry.get()
+        event_description = self.event_description_entry.get()
+
+        if event_name == "":
+            self.error_label["text"] = "Please enter an event name!"
+            return
+        if event_description == "":
+            self.error_label["text"] = "Please enter an event description!"
+            return
+        if from_time == "" or not re.match(r"[0-9][0-9]:[0-9][0-9]", from_time):
+            self.error_label["text"] = "Please enter a starting time!"
+            return
+        if to_time == "" or not re.match(r"[0-9][0-9]:[0-9][0-9]", to_time):
+            self.error_label["text"] = "Please enter a ending time!"
+            return
+        if not self.check_time_validity(from_time) or not self.check_time_validity(to_time):
+            self.error_label["text"] = "Please enter a valid starting/ending time!"
+            return
+
         self.events.append(Event(from_time, to_time, event_name, event_description, self.event_id_tracker))
 
         self.event_id_tracker += 1
+
+    def check_time_validity(self, time: str) -> tuple[int, int] | bool:
+        hour = int(time[0:2])
+        minute = int(time[3:5])
+        if hour > 23 or minute > 59:
+            return False
+        return (hour, minute)
 
     def delete_event(self, event_id: int):
         for count, event in enumerate(self.events):
             if event.event_id == event_id:
                 self.events.pop(count)
                 print("Event deleted successfully!")
-                return
         raise Exception("Event is not found with id", event_id)
 
 
@@ -248,6 +322,7 @@ class Event():
         self.event_name = event_name
         self.event_description = event_description
         self.event_id = event_id
+        print("Event created successfully!", from_time, to_time, event_name, event_description, event_id)
 
 
 if __name__ == "__main__":
@@ -256,12 +331,3 @@ if __name__ == "__main__":
     app.display_month()
 
     app.root.mainloop()
-
-
-def ask_for_data():
-    if app:
-        date_ = input("Test week num\nFormat: YYYYMMDD\n")
-        year = int(date_[0:4])
-        year = app.year_numbers.index(year)
-        month = int(date_[4:6]) - 1
-        day = int(date_[6:8]) - 1
