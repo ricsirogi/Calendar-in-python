@@ -12,7 +12,7 @@ class Calendar():
     def __init__(self) -> None:
         self.MIN_YEAR = 1970
         self.MAX_YEAR = 2050
-        self.device = "laptop" # laptop or pc
+        self.device = "pc"  # laptop or pc
         if self.device == "laptop":
             self.DAY_WIDTH = 10
             self.DAY_HEIGHT = 2
@@ -25,9 +25,9 @@ class Calendar():
         self.month_names = ["January", "February", "March", "April", "May", "June",
                             "July", "August", "September", "October", "November", "December"]
         self.days_in_a_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        self.general_font = ("Consolas", 20)
 
         self.years: list[Year] = []
-
 
         for i in self.year_numbers:
             if len(self.years) != 0:
@@ -40,8 +40,6 @@ class Calendar():
         # These will be used as indexes
         self.current_year = self.year_numbers.index(int(today[0:4]))
         self.current_month = int(today[5:7]) - 1
-
-        self.general_font = ("Consolas", 20)
 
         self.root = tk.Tk()
         self.root.title("Calendar")
@@ -172,7 +170,6 @@ class Calendar():
 
             day_label.grid(row=row, column=column)
 
-
             day_label.bind("<Button-1>", lambda event, day=day: day.add_event())
 
         # If we got to either edge of the calendar, disable the button in that direction
@@ -190,6 +187,7 @@ class Calendar():
         Obsolete, since the calendar is not in the console anymore,
         but could still use this during testing
         """
+
         from_time = input("From what time will the event take place?\nFormat: HHMM\n")
         to_time = input("Until what time will the event take place?\nFormat: HHMM\n")
         event_name = input("What will be the name of the event?\n")
@@ -205,7 +203,7 @@ class Calendar():
 
 
 class Year():
-    def __init__(self, year_num: int, starting_day: str, month_names: list[str], calendar:Calendar) -> None:
+    def __init__(self, year_num: int, starting_day: str, month_names: list[str], calendar: Calendar) -> None:
         self.leap_year = self.is_leap_year(year_num)
 
         self.year_num = year_num
@@ -228,7 +226,7 @@ class Year():
 
 
 class Month():
-    def __init__(self, name: str, length: int, day_name: str, year:Year) -> None:
+    def __init__(self, name: str, length: int, day_name: str, year: Year) -> None:
         self.name = name
         self.length = length
         self.last_used_day_name = day_name
@@ -251,48 +249,51 @@ class Month():
 
 
 class Day():
-    def __init__(self, day_num: int, day_name: str, week_index: int, day_index, month:Month) -> None:
+    def __init__(self, day_num: int, day_name: str, week_index: int, day_index, month: Month) -> None:
         self.day_num = day_num
         self.day_name = day_name
         self.week_index = week_index
         self.day_index = day_index
         self.month = month
         self.only_name = True
-        self.EVENT_Y_TOP_OFFSET = 7
+        self.EVENT_Y_TOP_OFFSET = 28
+        self.general_font = self.month.year.calendar.general_font
 
         device = self.month.year.calendar.device
         if device == "laptop":
             self.max_event_display = 2
             self.max_event_width = 17
+            self.between_events_distance = 17
         elif device == "pc":
-            self.max_event_display = 5
+            self.max_event_display = 6
             self.max_event_width = 20
+            self.between_events_distance = 20
         else:
             print("This should never be printed, because this exception was raised at the beggining of the file")
             raise Exception("Invalid device:", device)
-        
+
         # Every event will have a different event ID, that is unique on the given day, but not in a bigger scope
         self.event_id_tracker = 0
-        self.events: list[Event] = [] # This is going to be used as a queue
+        self.events: list[Event] = []  # This is going to be used as a queue
 
     def add_event(self, event_id: int = -1):
         self.event_window = tk.Tk()
         title = "Add event" if event_id == -1 else "Modify event"
         self.event_window.title(title)
 
-        self.event_name_label = tk.Label(self.event_window, text="Event name:")
-        self.event_name_entry = tk.Entry(self.event_window)
-        self.from_time_label = tk.Label(self.event_window, text="Event starts at:")
-        self.from_time_entry = tk.Entry(self.event_window)
-        self.to_time_label = tk.Label(self.event_window, text="Event ends at:")
-        self.to_time_entry = tk.Entry(self.event_window)
-        self.event_description_label = tk.Label(self.event_window, text="Event description:")
-        self.event_description_entry = tk.Entry(self.event_window)
-        self.error_label = tk.Label(self.event_window, text="")
+        self.event_name_label = tk.Label(self.event_window, font=self.general_font, text="Event name:")
+        self.event_name_entry = tk.Entry(self.event_window, font=self.general_font)
+        self.from_time_label = tk.Label(self.event_window, font=self.general_font, text="Event starts at:")
+        self.from_time_entry = tk.Entry(self.event_window, font=self.general_font)
+        self.to_time_label = tk.Label(self.event_window, font=self.general_font, text="Event ends at:")
+        self.to_time_entry = tk.Entry(self.event_window, font=self.general_font)
+        self.event_description_label = tk.Label(self.event_window, font=self.general_font, text="Event description:")
+        self.event_description_entry = tk.Entry(self.event_window, font=self.general_font)
+        self.error_label = tk.Label(self.event_window, font=self.general_font, text="")
 
-        self.event_create_button = tk.Button(self.event_window, text="Create event",
+        self.event_create_button = tk.Button(self.event_window, font=self.general_font, text="Create event",
                                              command=lambda: self.create_event())
-        self.event_cancel_button = tk.Button(self.event_window, text="Cancel",
+        self.event_cancel_button = tk.Button(self.event_window, font=self.general_font, text="Cancel",
                                              command=lambda: self.event_window.destroy())
 
         self.event_name_label.grid(row=0, column=0)
@@ -303,13 +304,15 @@ class Day():
         self.to_time_entry.grid(row=2, column=1)
         self.event_description_label.grid(row=3, column=0)
         self.event_description_entry.grid(row=3, column=1)
-        self.event_create_button.grid(row=0, column=2, rowspan=4)
-        self.event_cancel_button.grid(row=4, column=2)
+        self.event_create_button.grid(row=0, column=2, rowspan=2)
+        self.event_cancel_button.grid(row=2, column=2, rowspan=2)
         self.error_label.grid(row=5, column=0, columnspan=3)
 
         if event_id != -1:
             event_origin = self.get_event_by_id(event_id)
-            
+            if not event_origin:
+                raise Exception("Event is not found with id", event_id)
+
             event_origin.modify_event_window.destroy()
 
             self.event_name = event_origin.event_name
@@ -322,9 +325,87 @@ class Day():
             self.to_time_entry.insert(0, self.to_time)
             self.event_description_entry.insert(0, self.event_description)
 
-            self.event_create_button.config(text="Modify event", command=lambda:self.create_event(event_id))
+            self.event_create_button.config(text="Modify event", command=lambda: self.create_event(event_id))
+
+        self.center_window(self.event_window)
 
         self.event_window.mainloop()
+
+    def create_event(self, event_id: int = -1):
+        if not self.validate_input():
+            return
+
+        if event_id != -1:
+            self.delete_event(event_id)
+
+        event_name = self.event_name_entry.get()
+        from_time = self.from_time_entry.get()
+        to_time = self.to_time_entry.get()
+        event_description = self.event_description_entry.get()
+
+        if self.get_event_by_id(self.event_id_tracker):
+            self.delete_event(self.event_id_tracker)
+
+        self.events.insert(0, Event(from_time, to_time, event_name, event_description, self.event_id_tracker, self))
+        if len(self.events) <= self.max_event_display:
+            self.calculate_event_padding(self.events[0])
+
+            self.events[0].event_name_short_label.bind("<Button-1>", lambda event: self.events[-1].modify_event(event))
+
+        self.event_window.destroy()
+
+        self.event_id_tracker += 1
+
+    def delete_event(self, event_id: int):
+        """
+        Find the event and delete it while also unmapping every event on the given day
+        and map the two first events in the queue
+        """
+
+        # Delete the modify event window if it exists
+        event = self.get_event_by_id(event_id)
+        if event:
+            if event.modify_event_window:
+                event.modify_event_window.destroy()
+
+        found = False
+        for count, event in enumerate(self.events):
+            if event.event_name_short_label.winfo_ismapped():
+                event.event_name_short_label.grid_forget()
+            if event.event_id == event_id:
+                self.events.pop(count)
+                found = True
+                print("Event deleted successfully!", self.events)
+        if self.events:
+            for i in range(self.max_event_display):
+                if i < len(self.events):
+                    self.calculate_event_padding(self.events[-(i + 1)], i)
+        if not found:
+            raise Exception("Event is not found with id", event_id)
+
+    def calculate_event_padding(self, event: "Event", order_override: int = -1):
+        """
+        Calculates the top padding for the event name label and also maps it
+        """
+        event_num = (len(self.events) - 1) if order_override == -1 else order_override
+
+        pady = (self.EVENT_Y_TOP_OFFSET + event_num * self.between_events_distance, 0)
+        event.event_name_short_label.grid(
+            row=self.week_index + 1, column=self.day_index, sticky="wn", pady=pady, padx=(1, 0))
+
+    def center_window(self, window: tk.Tk) -> None:
+        x = int(window.winfo_screenwidth() / 2 - window.winfo_reqwidth() / 2)
+        y = int(window.winfo_screenheight() / 2 - window.winfo_reqheight() / 2)
+        window.geometry(f"+{x}+{y}")
+
+    def check_time_validity(self, time: str) -> tuple[int, int] | None:
+        """
+        returns none if the time is invalid, otherwise returns a tuple of the hour and minute
+        """
+        hour = int(time[0:2])
+        minute = int(time[3:5])
+        if 0 <= hour <= 23 and 0 <= minute <= 59:
+            return (hour, minute)
 
     def validate_input(self) -> bool:
         """
@@ -338,7 +419,7 @@ class Day():
         if event_name == "":
             self.error_label["text"] = "Please enter an event name!"
             return False
-        if not self.only_name: # For debugging and testing it will ignore errors except name
+        if not self.only_name:  # For debugging and testing it will ignore errors except name
             if event_description == "":
                 self.error_label["text"] = "Please enter an event description!"
                 return False
@@ -356,104 +437,64 @@ class Day():
             to_time_h, to_time_m = self.check_time_validity(to_time)  # type:ignore
             if to_time_h < from_time_h or (to_time_h == from_time_h and to_time_m < from_time_m):
                 self.error_label["text"] = "The event cannot end before it starts!"
-                return
+                return False
 
         self.error_label.config(text="")
 
         return True
-    
-    def create_event(self, event_id: int = -1):
-        if not self.validate_input():
-            return
-        
-        if event_id != -1:
-            self.delete_event(event_id)
 
-        event_name = self.event_name_entry.get()
-        from_time = self.from_time_entry.get()
-        to_time = self.to_time_entry.get()
-        event_description = self.event_description_entry.get()
-
-        if self.get_event_by_id(self.event_id_tracker):
-            self.delete_event(self.event_id_tracker)
-
-        self.events.insert(0, Event(from_time, to_time, event_name, event_description, self.event_id_tracker, self))
-        if len(self.events) <= self.max_event_display:
-            self.events[0].event_name_short_label.grid(row=self.week_index + 1, column=self.day_index, sticky="w", pady=(5,0))
-            if len(self.events) == 1:
-                self.events[0].pady = (self.EVENT_Y_TOP_OFFSET,0)
-            else:
-                self.events[0].pady = (self.EVENT_Y_TOP_OFFSET + len(self.events)*15,0)
-            self.events[0].event_name_short_label.grid_configure(pady= self.events[0].pady, padx=(1, 0))
-            self.events[0].event_name_short_label.bind("<Button-1>", lambda event: self.events[-1].modify_event(event))
-        
-        self.event_window.destroy()
-
-            
-        self.event_id_tracker += 1
-
-    def check_time_validity(self, time: str) -> tuple[int, int] | None:
-        """
-        returns none if the time is invalid, otherwise returns a tuple of the hour and minute
-        """
-        hour = int(time[0:2])
-        minute = int(time[3:5])
-        if 0 <= hour <= 23 and 0 <= minute <= 59:
-            return (hour, minute)
-
-    def delete_event(self, event_id: int):
-        """
-        Find the event and delete it while also unmapping every event on the given day
-        and map the two first events in the queue
-        """
-        found = False
-        for count, event in enumerate(self.events):
-            if event.event_name_short_label.winfo_ismapped():
-                event.event_name_short_label.grid_forget()
-            if event.event_id == event_id:
-                self.events.pop(count)
-                found = True
-                print("Event deleted successfully!", self.events)
-        if self.events:
-            for i in range(self.max_event_display):
-                if i < len(self.events):
-                    self.events[-(i+1)].event_name_short_label.grid(row=self.week_index + 1, column=self.day_index, sticky="w", pady=self.events[-(i+1)].pady, padx=(1,0))
-        if not found:
-            raise Exception("Event is not found with id", event_id)
-
-    def get_event_by_id(self, id:int) -> "Event":
+    def get_event_by_id(self, id: int) -> "Event | None":
         for event in self.events:
             if event.event_id == id:
                 return event
-        return None
+        return
+
+
 class Event():
-    def __init__(self, from_time: str, to_time: str, event_name: str, event_description: str, event_id: int, day:Day) -> None:
+    def __init__(self, from_time: str, to_time: str, event_name: str, event_description: str, event_id: int, day: Day) -> None:
         self.from_time = from_time
         self.to_time = to_time
         self.event_name = event_name
         self.event_description = event_description
         self.event_id = event_id
-        self.event_data:list[str] = [event_name, from_time, to_time, event_description]
+        self.event_data: list[str] = [event_name, from_time, to_time, event_description]
         short_name = event_name
         self.day = day
         self.frame = day.month.year.calendar.month_display_frame
         self.max_event_width = day.max_event_width
-        self.pady:tuple[int, int] = ()
+        self.pady: tuple[int, int] = (-1, -1)
+        self.general_font = day.month.year.calendar.general_font
+        self.device = day.month.year.calendar.device
 
-        if len(short_name) > self.max_event_width :
+        if self.device == "laptop":
+            self.font_size = 10
+        elif self.device == "pc":
+            self.font_size = 13
+        else:
+            raise Exception("Invalid device:", self.device)
+
+        if len(short_name) > self.max_event_width:
             short_name = short_name[:self.max_event_width] + "..."
-        self.event_name_short_label = tk.Label(self.frame, text=short_name, font=("Consolas", 10), bg="SystemButtonFace")
+        self.event_name_short_label = tk.Label(self.frame, text=short_name,
+                                               font=("Consolas", self.font_size), bg="SystemButtonFace")
         print("Event created successfully!", from_time, to_time, event_name, event_description, event_id)
 
     def modify_event(self, event):
         self.modify_event_window = tk.Tk()
         self.modify_event_window.title("Modify event")
-        label_pretexts = ["From time: ", "To time: ", "Event name: ", "Event description: "]
-        for count, (label_pretext, label_text) in enumerate(zip(label_pretexts,self.event_data)):
-            label = tk.Label(self.modify_event_window, text=label_pretext + label_text)
-            label.grid(row=count, column=0)
-        modify_button = tk.Button(self.modify_event_window, text="Modify", command=lambda: self.day.add_event(self.event_id))
-        modify_button.grid(row=0, column=1, rowspan=4)
+        label_pretexts = ["Event name: ", "From time: ", "To time: ", "Event description: "]
+        for count, (label_pretext, label_text) in enumerate(zip(label_pretexts, self.event_data)):
+            label = tk.Label(self.modify_event_window, font=self.general_font, text=label_pretext + label_text)
+            label.grid(row=count, column=0, sticky="w")
+        modify_button = tk.Button(self.modify_event_window, font=self.general_font, text="Modify",
+                                  command=lambda: self.day.add_event(self.event_id))
+        delete_button = tk.Button(self.modify_event_window, font=self.general_font, text="Delete",
+                                  command=lambda: self.day.delete_event(self.event_id))
+
+        modify_button.grid(row=0, column=1, rowspan=2)
+        delete_button.grid(row=2, column=1, rowspan=2)
+
+        self.day.center_window(self.modify_event_window)
         self.modify_event_window.mainloop()
 
 
