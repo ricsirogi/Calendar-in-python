@@ -12,7 +12,7 @@ class Calendar():
     def __init__(self) -> None:
         self.MIN_YEAR = 1970
         self.MAX_YEAR = 2050
-        self.device = "pc"  # laptop or pc
+        self.device = "laptop"  # laptop or pc
         if self.device == "laptop":
             self.DAY_WIDTH = 10
             self.DAY_HEIGHT = 2
@@ -83,6 +83,9 @@ class Calendar():
         self.month_name_label.bind("<Button-1>", lambda event, arg="m": self.change_date(event, arg))
         self.change_year_combobox.bind("<Return>", lambda event, arg="by": self.change_date(event, arg))
         self.change_month_combobox.bind("<Return>", lambda event, arg="bm": self.change_date(event, arg))
+        
+        self.display_month()
+        self.years[0].months[0].days[0].center_window(self.root)
 
     def navigate_press(self, direction: str):
         if direction == "l":
@@ -263,7 +266,7 @@ class Day():
         if device == "laptop":
             self.max_event_display = 2
             self.max_event_width = 17
-            self.between_events_distance = 17
+            self.between_events_distance = 18
         elif device == "pc":
             self.max_event_display = 6
             self.max_event_width = 20
@@ -314,6 +317,7 @@ class Day():
                 raise Exception("Event is not found with id", event_id)
 
             event_origin.modify_event_window.destroy()
+            event_origin.modify_event_window = None
 
             self.event_name = event_origin.event_name
             self.from_time = event_origin.from_time
@@ -350,7 +354,7 @@ class Day():
         if len(self.events) <= self.max_event_display:
             self.calculate_event_padding(self.events[0])
 
-            self.events[0].event_name_short_label.bind("<Button-1>", lambda event: self.events[-1].modify_event(event))
+            self.events[0].event_name_short_label.bind("<Button-1>", lambda event:self.events[0].modify_event())
 
         self.event_window.destroy()
 
@@ -365,8 +369,10 @@ class Day():
         # Delete the modify event window if it exists
         event = self.get_event_by_id(event_id)
         if event:
-            if event.modify_event_window:
-                event.modify_event_window.destroy()
+            if event.modify_event_window is not None:
+                if event.modify_event_window.winfo_exists():
+                    event.modify_event_window.destroy()
+                event.modify_event_window = None
 
         found = False
         for count, event in enumerate(self.events):
@@ -394,8 +400,9 @@ class Day():
             row=self.week_index + 1, column=self.day_index, sticky="wn", pady=pady, padx=(1, 0))
 
     def center_window(self, window: tk.Tk) -> None:
-        x = int(window.winfo_screenwidth() / 2 - window.winfo_reqwidth() / 2)
-        y = int(window.winfo_screenheight() / 2 - window.winfo_reqheight() / 2)
+        window.update_idletasks() # This updates the window's widgets so it's size is properly readable
+        x = int(abs(window.winfo_screenwidth() / 2 - window.winfo_reqwidth() / 2))
+        y = int(abs(window.winfo_screenheight() / 2 - window.winfo_reqheight() / 2))
         window.geometry(f"+{x}+{y}")
 
     def check_time_validity(self, time: str) -> tuple[int, int] | None:
@@ -479,7 +486,7 @@ class Event():
                                                font=("Consolas", self.font_size), bg="SystemButtonFace")
         print("Event created successfully!", from_time, to_time, event_name, event_description, event_id)
 
-    def modify_event(self, event):
+    def modify_event(self):
         self.modify_event_window = tk.Tk()
         self.modify_event_window.title("Modify event")
         label_pretexts = ["Event name: ", "From time: ", "To time: ", "Event description: "]
@@ -501,6 +508,5 @@ class Event():
 if __name__ == "__main__":
     app = Calendar()
 
-    app.display_month()
 
     app.root.mainloop()
