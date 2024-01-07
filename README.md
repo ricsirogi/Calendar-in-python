@@ -14,8 +14,8 @@ I'm trying to create a functioning calendar in python that will work for windows
 - [x] The events should be displayed, so I want to do what google calendar does on phone, and have a little space below the days and the first few words of the event can be displayed there
 - [x] and these events will also be clickable, and when clicked a new window pops up, where you can view the event
 - [x] There's a button in the event view window, to edit the event
-- [x] Fix the events, because if you modify events when there are two or more events then the first event will take the the place of the last/second (idk) event and the first place will just be left out with (i guess) an emtpy string
-- [ ] Instead of the 'add event' window popping up when a day is clicked, an 'events view' window pops up where you can see all the events, there's an 'add' button to add an event
+- [ ] Fix the events, because if you modify events when there are two or more events then the first event will take the the place of the last/second (idk) event and the first place will just be left out with (i guess) an emtpy string
+
 - [ ] Maybe find a better way to change the month and year
 - [ ] Store events in a json file
 - [ ] Optimizations, like instead of generating each month's days every time, store them, and access them when needed
