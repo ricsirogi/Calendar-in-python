@@ -15,7 +15,10 @@ I'm trying to create a functioning calendar in python that will work for windows
 - [x] and these events will also be clickable, and when clicked a new window pops up, where you can view the event
 - [x] There's a button in the event view window, to edit the event
 - [x] Fix the events, because if you modify events when there are two or more events then the first event will take the the place of the last/second (idk) event and the first place will just be left out with (i guess) an emtpy string
-- [ ] Instead of the 'add event' window popping up when a day is clicked, an 'events view' window pops up where you can see all the events, there's an 'add' button to add an event
+- [x] Instead of the 'add event' window popping up when a day is clicked, an 'events view' window pops up where you can see all the events, there's an 'add' button to add an event, or you can click any of the events to view them and then modify them
+- [x] The events are sorted by their start time
+- [ ] Make it so the user can't open more than one window at any time
+- [ ] Fix the bug where when I step between months the events are no longer visible if I go back (so I create an event on august, go to september, back go august, the event I created there is gone, but if I click on its day, it's still there)
 - [ ] Maybe find a better way to change the month and year
 - [ ] Store events in a json file
 - [ ] Optimizations, like instead of generating each month's days every time, store them, and access them when needed
