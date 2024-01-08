@@ -17,10 +17,13 @@ I'm trying to create a functioning calendar in python that will work for windows
 - [x] Fix the events, because if you modify events when there are two or more events then the first event will take the the place of the last/second (idk) event and the first place will just be left out with (i guess) an emtpy string
 - [x] Instead of the 'add event' window popping up when a day is clicked, an 'events view' window pops up where you can see all the events, there's an 'add' button to add an event, or you can click any of the events to view them and then modify them
 - [x] The events are sorted by their start time
-- [ ] The sorting sometimes just straight up doesn't remove the old labels and so when sorting there are two times more widgets and it's a mess so I want to fix that
-- [ ] Make it so the user can't open more than one window at any time
-- [ ] Fix the bug where when I step between months the events are no longer visible if I go back (so I create an event on august, go to september, back go august, the event I created there is gone, but if I click on its day, it's still there)
-- [ ] Maybe find a better way to change the month and year
+- [x] The sorting sometimes just straight up doesn't remove the old labels and so when sorting there are two times more widgets and it's a mess so I want to fix that (fixed I think)
+- [x] Make it so the user can't open more than one window at any time
+- [x] Fix the bug where when I step between months the events are no longer visible if I go back (so I create an event on august, go to september, back go august, the event I created there is gone, but if I click on its day, it's still there)
+- [ ] Make it so the program doesn't create a new window every time for viewing, configuring events and stuff, but use one window and use frames or the tk.Notepad thing to change its contents
+- [ ] Find a better way to change the month and year
+- [ ] Find a better way to give the starting and ending time for events
 - [ ] Store events in a json file
 - [ ] Optimizations, like instead of generating each month's days every time, store them, and access them when needed
+  - [x] Make it so after generating everything, if the user steps between months, the program doesn't generate new labels for every day, but uses the already generated label (if the month's day_labels have been generated already)
 - [ ] Make more specific exceptions
