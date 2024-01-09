@@ -6,7 +6,7 @@ from datetime import date
 import tkinter as tk
 from tkinter import ttk
 import re
-from typing import Optional
+from typing import cast
 import sys
 
 
@@ -34,7 +34,7 @@ class Calendar():
         self.already_displayed_months: set[Month] = set()
 
         self.root = tk.Tk()
-        self.root.protocol("WM_DELETE_WINDOW", lambda: sys.exit(0))
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         # I need to move this up here, because the day labels are in this frame
         self.month_display_frame = tk.Frame(self.root)
@@ -93,6 +93,10 @@ class Calendar():
 
         self.display_month()
         self.years[0].months[0].days[0].center_window(self.root)
+
+    def on_close(self):
+        print("Application closing...")
+        sys.exit(0)
 
     def navigate_press(self, direction: str):
         if direction == "l":
@@ -186,7 +190,7 @@ class Calendar():
 
                 day.label.grid(row=row, column=column)
 
-                day.label.bind("<Button-1>", lambda event, day=day: day.view_events_window())
+                day.label.bind("<Button-1>", lambda event, day=day: day.open_view_events_window())
                 self.already_displayed_months.add(month)
         else:
             for day in month.days:
@@ -288,6 +292,8 @@ class Day():
         self.EVENT_Y_TOP_OFFSET = 28
         self.general_font = self.month.year.calendar.general_font
         self.max_event_name_length = 30
+
+        # The label to display the day number
         self.label: tk.Label = tk.Label(self.month.year.calendar.month_display_frame)
 
         device = self.month.year.calendar.device
@@ -306,22 +312,66 @@ class Day():
 
         # Every event will have a different event ID, that is unique on the given day, but not in a bigger scope
         self.event_id_tracker = 0
+
         self.events: list[Event] = []  # This is going to be used as a queue
 
-    def view_events_window(self):
-        if not self.init_event_window():
-            return
+    def open_view_events_window(self):
+        """
+        The frame hiearchy is a bit confusing at first but it's like this:
+        view_events_frame contains collecting_frame
+        collecting frame contains everything
+        all_events_frame contains every event's event_frame
+        event_frame contains the event's name and duration
+        This is made like this so I can destroy the events' displays in this window so I can update them.
+        """
+
+        print("opened view_events_window")
+        # Try to open the window, if it's already open, then the function will just change the frame
+        self.init_event_window()
 
         self.event_window.title("View events")
-        # Since viewing events and adding events are the same window, we need to destroy the children
-        self.destroy_children(self.event_window, "destroy")
+
+        if "view_events_frame" not in vars(self):
+            self.view_events_frame = tk.Frame(self.event_window)
+
+        # This frame helps in destroying the events' displays in this window so I can update them.
+        # I need this because otherwise they would stay here and I don't want to manage that in the delete function
+        # TL;DR: This frame contains every widget that needs to be destroyed when updating which events to view
+        collecting_frame = tk.Frame(self.view_events_frame)
+        collecting_frame.grid(row=0, column=0)
+
+        # Destroy the all_events_frame that is inside the collecting_frame that is inside the view_events_frame
+        if self.view_events_frame.winfo_children() != []:
+            view_events_frame_children = self.view_events_frame.children
+            if "!frame" in view_events_frame_children:
+                if "!frame" in view_events_frame_children["!frame"].children:
+                    self.view_events_frame.children["!frame"].children["!frame"].destroy()
+
+        # Create the canvas and scrollbar and add button when the day is opened for the first time
+        self.view_events_canvas = tk.Canvas(collecting_frame)
+        self.view_events_scrollbar = tk.Scrollbar(collecting_frame, command=self.view_events_canvas.yview)
+        self.add_button = tk.Button(collecting_frame, font=self.general_font,
+                                    text="Add", command=lambda: self.open_add_event_window())
+
+        self.view_events_canvas.grid(row=0, column=0, sticky='w')
+        self.view_events_scrollbar.grid(row=0, column=1, sticky='e')
+        self.add_button.grid(row=0, column=2, sticky="we")
+
+        if len(self.events) == 0:
+            self.view_events_canvas.grid_remove()
+            self.view_events_scrollbar.grid_remove()
+
+        # Dont need parantheses for the set function because I'm passing the function not it's return value
+        self.view_events_canvas.configure(yscrollcommand=self.view_events_scrollbar.set)
+
+        all_events_frame = tk.Frame(collecting_frame)
+        all_events_frame.grid(row=0, column=0)
 
         for count, event in enumerate(self.events):
-            event_frame = tk.Frame(self.event_window)
+            event_frame = tk.Frame(all_events_frame)
 
             event_name = event.event_name
             event_duration = event.from_time + " - " + event.to_time
-            event_id = event.event_id
 
             name_label = tk.Label(event_frame, font=self.general_font, text=event_name)
             duration_label = tk.Label(event_frame, font=self.general_font, text=event_duration)
@@ -330,72 +380,88 @@ class Day():
             duration_label.grid(row=1, column=0, sticky="w")
 
             event_frame.grid(row=count, column=0, sticky="w")
-            name_label.bind("<Button-1>", lambda e, event=event: self.view_event_del_window(event))
-            duration_label.bind("<Button-1>", lambda e, event=event: self.view_event_del_window(event))
+            name_label.bind("<Button-1>", lambda e, event=event: event.view_event())
+            duration_label.bind("<Button-1>", lambda e, event=event: event.view_event())
 
-        self.add_button = tk.Button(self.event_window, font=self.general_font,
-                                    text="Add", command=lambda: self.open_add_event_window())
+        self.view_events_canvas.create_window((0, 0), window=all_events_frame, anchor="nw")
+        all_events_frame.bind("<Configure>", lambda event: self.view_events_canvas.configure(
+            scrollregion=self.view_events_canvas.bbox("all")))
 
         if len(self.events) == 0:
-            rowspan = 1
-            no_events_label = tk.Label(self.event_window, font=self.general_font, text="No events on this day")
+            print("No events, displaying no_events_label")
+            no_events_label = tk.Label(collecting_frame, font=self.general_font, text="No events on this day")
             no_events_label.grid(row=0, column=0)
-        else:
-            rowspan = len(self.events)
 
-        self.add_button.grid(row=0, column=1, rowspan=rowspan)
+        self.change_frame(self.view_events_frame)
+
         self.center_window(self.event_window)
-        self.event_window.mainloop()
+
+        print("Ended open_view_events_window()\n\n")
 
     def open_add_event_window(self, event_id: int = -1):
-        if not self.init_event_window(event_id):
-            return
+        print("Opening add event window")
+        # Try to open the window, if it's already open, then the function will just change the frame
+        self.init_event_window()
 
         title = "Add event" if event_id == -1 else "Modify event"
         self.event_window.title(title)
 
-        # If the event_name_label doesn't exist then none of these exists, so we create them
-        self.event_name_label = tk.Label(self.event_window, font=self.general_font, text="Event name:")
-        self.event_name_entry = tk.Entry(self.event_window, font=self.general_font)
-        self.from_time_label = tk.Label(self.event_window, font=self.general_font, text="Event starts at:")
-        self.from_time_entry = tk.Entry(self.event_window, font=self.general_font)
-        self.to_time_label = tk.Label(self.event_window, font=self.general_font, text="Event ends at:")
-        self.to_time_entry = tk.Entry(self.event_window, font=self.general_font)
-        self.event_description_label = tk.Label(
-            self.event_window, font=self.general_font, text="Event description:")
-        self.event_description_entry = tk.Entry(self.event_window, font=self.general_font)
-        self.error_label = tk.Label(self.event_window, font=self.general_font, text="")
+        if "modify_event_frame" not in vars(self):
+            self.modify_event_frame = tk.Frame(self.event_window)
 
-        self.event_create_button = tk.Button(self.event_window, font=self.general_font, text="Create event",
-                                             command=lambda: self.create_event_and_sort())
-        self.event_cancel_button = tk.Button(self.event_window, font=self.general_font, text="Cancel",
-                                             command=lambda: self.close_event_window())
+        # Only generate these widgets if they don't exist
+        # Otherwise they've been already grid()ed
+        if self.modify_event_frame.winfo_children() == []:
+            self.label_frame = tk.Frame(self.modify_event_frame)
+            self.input_frame = tk.Frame(self.modify_event_frame)
 
-        self.event_name_label.grid(row=0, column=0)
-        self.event_name_entry.grid(row=0, column=1)
-        self.from_time_label.grid(row=1, column=0)
-        self.from_time_entry.grid(row=1, column=1)
-        self.to_time_label.grid(row=2, column=0)
-        self.to_time_entry.grid(row=2, column=1)
-        self.event_description_label.grid(row=3, column=0)
-        self.event_description_entry.grid(row=3, column=1)
-        self.event_create_button.grid(row=0, column=2, rowspan=2)
-        self.event_cancel_button.grid(row=2, column=2, rowspan=2)
-        self.error_label.grid(row=5, column=0, columnspan=3)
+            # If the event_name_label doesn't exist then none of these exists, so we create them
+            self.event_name_label = tk.Label(self.label_frame, font=self.general_font, text="Event name:")
+            self.event_name_entry = tk.Entry(self.input_frame, font=self.general_font)
+            self.from_time_label = tk.Label(self.label_frame, font=self.general_font, text="Event starts at:")
+            self.from_time_entry = tk.Entry(self.input_frame, font=self.general_font)
+            self.to_time_label = tk.Label(self.label_frame, font=self.general_font, text="Event ends at:")
+            self.to_time_entry = tk.Entry(self.input_frame, font=self.general_font)
+            self.event_description_label = tk.Label(
+                self.label_frame, font=self.general_font, text="Event description:")
+            self.event_description_entry = tk.Entry(self.input_frame, font=self.general_font)
+
+            # This doesn't get put into any frame, but rather will be placed below them
+            self.error_label = tk.Label(self.event_window, font=self.general_font, text="")
+
+            self.event_create_button = tk.Button(self.input_frame, font=self.general_font, text="Create event",
+                                                 command=lambda: self.create_event_and_sort())
+            self.event_cancel_button = tk.Button(self.input_frame, font=self.general_font, text="Cancel",
+                                                 command=lambda: self.close_event_window())
+
+            self.label_frame.grid(row=0, column=0)
+            self.input_frame.grid(row=0, column=1)
+
+            self.event_name_label.grid(row=0, column=0, sticky="e")
+            self.from_time_label.grid(row=1, column=0, sticky="e")
+            self.to_time_label.grid(row=2, column=0, sticky="e")
+            self.event_description_label.grid(row=3, column=0, sticky="e")
+
+            self.event_name_entry.grid(row=0, column=1, sticky="w")
+            self.from_time_entry.grid(row=1, column=1, sticky="w")
+            self.to_time_entry.grid(row=2, column=1, sticky="w")
+            self.event_description_entry.grid(row=3, column=1, sticky="w")
+            self.event_create_button.grid(row=0, column=2, rowspan=2, sticky="w", padx=(10, 0))
+            self.event_cancel_button.grid(row=2, column=2, rowspan=2, sticky="w", padx=(10, 0))
+
+            self.error_label.grid(row=1, column=0, columnspan=2)
 
         if event_id != -1:
             event_origin = self.get_event_by_id(event_id)
             if not event_origin:
                 raise Exception("Event is not found with id", event_id)
 
-            if event_origin.modify_event_window is not None:
-                event_origin.modify_event_window.destroy()
-                event_origin.modify_event_window = None
-
             self.event_name = event_origin.event_name
             self.from_time = event_origin.from_time
             self.to_time = event_origin.to_time
             self.event_description = event_origin.event_description
+
+            self.clear_input_entries()
 
             self.event_name_entry.insert(0, self.event_name)
             self.from_time_entry.insert(0, self.from_time)
@@ -404,10 +470,26 @@ class Day():
 
             self.event_create_button.config(
                 text="Modify event", command=lambda event_id=event_id: self.modify_event(event_id))
+        else:
+            self.clear_input_entries()
+            self.event_create_button.config(text="Create event", command=lambda: self.create_event_and_sort())
 
+        self.change_frame(self.modify_event_frame)
         self.center_window(self.event_window)
+        print("Ended modify events\n\n")
 
-        self.event_window.mainloop()
+    def clear_input_entries(self, entry: tk.Entry | None = None):
+        """
+        By default clears the 4 (number might change) input entries\n
+        If you give an entry it'll clear that entry
+        """
+        if not entry:
+            self.event_name_entry.delete(0, tk.END)
+            self.from_time_entry.delete(0, tk.END)
+            self.to_time_entry.delete(0, tk.END)
+            self.event_description_entry.delete(0, tk.END)
+        else:
+            entry.delete(0, tk.END)
 
     def create_event_and_sort(self):
         self.create_event()
@@ -417,6 +499,9 @@ class Day():
         if not ignore_validation:
             if not self.validate_input():
                 return
+
+        print("\nstart of create")
+        self.print_events()
 
         # Get the data from the user, or resort to getting it from the event if it exists
         if not ignore_validation:
@@ -464,6 +549,8 @@ class Day():
             self.event_id_tracker += 1
         print("\nCreated event with name", event_name,
               f"\nid_of_new_event: {id_of_new_event}\nevent_id: {event_id}\nignore_validation: {ignore_validation}\norder: {order}\n")
+        print("\nend of create")
+        self.print_events()
 
     def modify_event(self, event_id: int):
         event = self.get_event_by_id(event_id)
@@ -491,15 +578,11 @@ class Day():
         Find the event and delete it while also unmapping every event on the given day
         and map the two first events in the queue
         """
-
+        print("\nstart of delete")
+        self.print_events()
         # Delete the modify event window if it exists
-        event = self.get_event_by_id(event_id)
-        if event:
-            if "modify_event_window" in vars(event):
-                if event.modify_event_window is not None:
-                    if event.modify_event_window.children != {}:
-                        event.modify_event_window.destroy()
-                    event.modify_event_window = None
+        # I don't know if I'll need to do this, so I'll just leave this here
+        pass
 
         # I'm not using self.get_event_by_id() because I need to iterate through the events anyway
         found = False
@@ -520,6 +603,11 @@ class Day():
             raise Exception("Event is not found with id", event_id)
 
         self.sort_events()
+        print("\nend of delete")
+        self.print_events()
+
+    def print_events(self):
+        print(" !Events:", [event.event_name for event in self.events])
 
     def sort_events(self):
         """
@@ -530,6 +618,8 @@ class Day():
         # the remaining event might be on the second place and we would need to "push it up"
         if len(self.events) == 0:
             return
+        print("\nstart of sort")
+        self.print_events()
 
         # Create a dictionary with the event_id as the key and the combined hour and minute as the value
         initial_dict: dict[str, int] = {}
@@ -568,6 +658,29 @@ class Day():
         for order, event in enumerate(new_events):
             # True is passed so it doesn't validate the input, order to pass the order for calculate_event_padding()
             self.create_event(event.event_id, True, order)
+        print("\nend of sort")
+        self.print_events()
+
+    def remove_from_dict(self, input_dict: dict["str", tk.Widget], key: str):
+        if key in input_dict:
+            input_dict[key].grid_remove()
+
+    def change_frame(self, frame_to_change_to: tk.Frame | None):
+        """
+        grid_remove()s the currently mapped frame from self.event_window
+        and grid()s the frame given as the parameter\n
+        You can add None as parameter to just grid_remove() the currently mapped frame
+        """
+        print("  !!Changing frame!!")
+
+        for frame in self.event_window.winfo_children():
+            frame.grid_remove()
+
+        if frame_to_change_to:
+            if frame_to_change_to.grid_info() == {}:
+                frame_to_change_to.grid(row=0, column=0)
+            else:
+                frame_to_change_to.grid()
 
     def sort_dict(self, input_dict: dict[str, int]) -> dict:
         """
@@ -575,44 +688,33 @@ class Day():
         """
         return dict(sorted(input_dict.items(), key=lambda item: item[1]))
 
-    def view_event_del_window(self, event: "Event"):
+    def init_event_window(self):
         """
-        calls the event's view_event function after destroying the event_window
+        Initializes the event window (if it wasn't already)\n
+        Lets the month know that the window is open\n
+        Binds the close_event_window function to the event_window's destroy event\n
+        Returns True if the window was initialized, False if it couldn't initialize\n
         """
-        if self.event_window:
-            self.close_event_window()
-            event.view_event()
-
-    def init_event_window(self, event_id: int = -1):
-        """
-        Initializes the event window (if it wasn't already)
-        Destroys its previous children
-        Lets the month know that the window is open
-        Binds the close_event_window function to the event_window's destroy event
-        Returns True if the window was initialized, False if it couldn't initialize
-        """
-        if self.month.window_open == self.day_num or self.month.window_open == 0:  # Allow to open a new window only if there's no other window open
-            self.close_event_window()
+        if not self.month.window_open:  # Allow to open a new window only if there's no other window open
             if "event_window" not in vars(self) or self.event_window.children == {}:
-                self.event_window = tk.Tk()
+                self.event_window = tk.Toplevel(self.month.year.calendar.root)
                 self.event_window.resizable(False, False)
-            # Since viewing events and adding events are the same window, we need to destroy the children
-            self.destroy_children(self.event_window, "destroy")
-            self.month.window_open = self.day_num
-            self.event_window.bind("<Destroy>", lambda e: self.close_event_window(True))
+            else:
+                self.event_window.wm_deiconify()
+            self.month.window_open = True
+            self.event_window.protocol("WM_DELETE_WINDOW", self.close_event_window)
             return True
         else:
             return False
 
-    def close_event_window(self, from_destroy_event: bool = False):
+    def close_event_window(self):
         """
         We need a sepearate function for this, because we also need to let the month know that the window is closed\n
         Also I check if the window actually exists, so I don't try to close the window if it's already closed\n
-        The parameter is used to check if the window was closed by the destroy event, 
-        because if it was, then I don't need to manually destroy it
         """
-        if not from_destroy_event and "event_window" in vars(self) and self.event_window.children != {}:
-            self.event_window.destroy()
+        if "event_window" in vars(self) and self.event_window.children != {}:
+            self.event_window.wm_withdraw()
+            self.change_frame(None)
         self.month.window_open = 0
 
     def destroy_children(self, parent: tk.Tk | tk.Frame, mode: str = "destroy"):
@@ -641,7 +743,7 @@ class Day():
         event.event_name_short_label.grid(
             row=self.week_index + 1, column=self.day_index, sticky="wn", pady=pady, padx=(1, 0))
 
-    def center_window(self, window: tk.Tk) -> None:
+    def center_window(self, window: tk.Tk | tk.Toplevel) -> None:
         window.update_idletasks()  # This updates the window's widgets so it's size is properly readable
         x = int(abs(window.winfo_screenwidth() / 2 - window.winfo_reqwidth() / 2))
         y = int(abs(window.winfo_screenheight() / 2 - window.winfo_reqheight() / 2))
@@ -735,35 +837,58 @@ class Event():
         self.set_name()
 
     def view_event(self):
-        self.modify_event_window: Optional[tk.Tk] = tk.Tk()
-        self.modify_event_window.resizable(False, False)
-        self.modify_event_window.title("View event")
+        print("Viewing a single event")
+        self.day.init_event_window()
+
+        self.day.event_window.title("View event")
+
+        self.view_event_frame = tk.Frame(self.day.event_window)
 
         event_data: list[str] = [self.short_name, self.from_time, self.to_time, self.event_description]
         pretexts = ["Event name: ", "From time: ", "To time: ", "Event description: "]
 
-        pretext_frame = tk.Frame(self.modify_event_window)
-        data_frame = tk.Frame(self.modify_event_window)
-        pretext_frame.grid(row=0, column=0)
-        data_frame.grid(row=0, column=1)
+        # If this is the first time the event was viewed, then initialize the frames and the buttons
+        if self.view_event_frame.winfo_children() == []:
+            pretext_frame = tk.Frame(self.view_event_frame)
+            data_frame = tk.Frame(self.view_event_frame)
+            pretext_frame.grid(row=0, column=0)
+            data_frame.grid(row=0, column=1)
 
-        for count, (label_pretext, label_text) in enumerate(zip(pretexts, event_data)):
-            pretext_label = tk.Label(pretext_frame, font=self.general_font, text=label_pretext)
-            data_label = tk.Label(data_frame, font=self.general_font, text=label_text)
+            modify_button = tk.Button(data_frame, font=self.general_font, text="Modify",
+                                      command=lambda event_id=self.event_id: self.day.open_add_event_window(event_id))
+            delete_button = tk.Button(data_frame, font=self.general_font, text="Delete",
+                                      command=lambda event_id=self.event_id: self.day.delete_event(event_id))
 
-            pretext_label.grid(row=count, column=0, sticky="e")
-            data_label.grid(row=count, column=0, sticky="w")
+            for count, (label_pretext, label_text) in enumerate(zip(pretexts, event_data)):
+                pretext_label = tk.Label(pretext_frame, font=self.general_font, text=label_pretext)
+                data_label = tk.Label(data_frame, font=self.general_font, text=label_text)
 
-        modify_button = tk.Button(data_frame, font=self.general_font, text="Modify",
-                                  command=lambda event_id=self.event_id: self.day.open_add_event_window(event_id))
-        delete_button = tk.Button(data_frame, font=self.general_font, text="Delete",
-                                  command=lambda event_id=self.event_id: self.day.delete_event(event_id))
+                pretext_label.grid(row=count, column=0, sticky="e")
+                data_label.grid(row=count, column=0, sticky="w")
 
-        modify_button.grid(row=0, column=2, rowspan=2)
-        delete_button.grid(row=2, column=2, rowspan=2)
+            modify_button.grid(row=0, column=2, rowspan=2)
+            delete_button.grid(row=2, column=2, rowspan=2)
 
-        self.day.center_window(self.modify_event_window)
-        self.modify_event_window.mainloop()
+        # If the event has been viewed before, then just update its data
+        else:
+            # Remove the previous data (because it might have been updated)
+            # No I will not make a check if the data was actually updated
+            pretext_frame = cast(tk.Frame, self.view_event_frame.winfo_children()[0])
+            data_frame = cast(tk.Frame, self.view_event_frame.winfo_children()[1])
+            self.day.destroy_children(pretext_frame)
+            self.day.destroy_children(data_frame)
+
+            # Create the new data
+            for count, (label_pretext, label_text) in enumerate(zip(pretexts, event_data)):
+                pretext_label = tk.Label(pretext_frame, font=self.general_font, text=label_pretext)
+                data_label = tk.Label(data_frame, font=self.general_font, text=label_text)
+
+                pretext_label.grid(row=count, column=0, sticky="e")
+                data_label.grid(row=count, column=0, sticky="w")
+
+        self.day.change_frame(self.view_event_frame)
+        self.day.center_window(self.day.event_window)
+        print("Ended view single event\n\n")
 
     def set_name(self):
         self.short_name = self.event_name

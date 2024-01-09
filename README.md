@@ -20,7 +20,7 @@ I'm trying to create a functioning calendar in python that will work for windows
 - [x] The sorting sometimes just straight up doesn't remove the old labels and so when sorting there are two times more widgets and it's a mess so I want to fix that (fixed I think)
 - [x] Make it so the user can't open more than one window at any time
 - [x] Fix the bug where when I step between months the events are no longer visible if I go back (so I create an event on august, go to september, back go august, the event I created there is gone, but if I click on its day, it's still there)
-- [ ] Make it so the program doesn't create a new window every time for viewing, configuring events and stuff, but use one window and use frames or the tk.Notepad thing to change its contents
+- [x] Make it so the program doesn't create a new window every time for viewing, configuring events and stuff, but use one window and use frames or the tk.Notepad thing to change its contents
 - [ ] Find a better way to change the month and year
 - [ ] Find a better way to give the starting and ending time for events
 - [ ] Store events in a json file
